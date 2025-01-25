@@ -33,7 +33,19 @@ def _is_one_hot_encoded(df, base):
     else:
         return False
 
-def add_random_noise(df, prob_replace=0.2, prob_flip=0.3, noise_scale=0.1, noise_col=None):
+def add_random_noise(df, prob_replace=0.2, noise_scale=0.1, noise_col=None):
+    """
+    Check if a column is one-hot encoded.
+
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    prob_replace (float): Probability to add noise to a particular row
+    noise_scale (float): Scale for the STD of noise
+    noise_col (str): The column to add noise too
+
+    Returns:
+    df (pd.DataFrame): Output DataFrame with noise.
+    """
     # create a copy
     df_noisy = df.copy()
 
@@ -77,7 +89,7 @@ def add_random_noise(df, prob_replace=0.2, prob_flip=0.3, noise_scale=0.1, noise
       elif df_noisy[noise_col].dtype == 'bool':  # boolean columns
           print("bool")
           # flip boolean values with the given probability
-          mask = np.random.rand(len(df_noisy)) < prob_flip
+          mask = np.random.rand(len(df_noisy)) < prob_replace
           df_noisy.loc[mask, noise_col] = ~df_noisy.loc[mask, noise_col]
 
     return df_noisy
