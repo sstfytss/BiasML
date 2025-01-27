@@ -18,7 +18,7 @@ def save_model(best_params, file_name):
   with open(file_name, 'w') as f:
     json.dump(best_params, f)
 
-def train_test_model(X, y, model_type):
+def train_test_model(X, y, model_type, file_path=False):
     """
     Train either a logistic regression, decision tree, or random forest model on the provided data.
 
@@ -40,19 +40,30 @@ def train_test_model(X, y, model_type):
       X_train_scaled = scaler.fit_transform(X_train)
       X_test_scaled = scaler.transform(X_test)
 
-      model = LogisticRegression(max_iter=1000)
+      if not file_path:
+        model = LogisticRegression(max_iter=1000)
+      else:
+        loaded_params = load_model(file_path)
+        model = LogisticRegression(**loaded_params)
       print(model)
       model.fit(X_train_scaled, y_train)
       y_pred = model.predict(X_test_scaled)
 
     elif model_type == "random_forest":
-      model = RandomForestClassifier(n_estimators=100, random_state=42)
+      if not file_path:
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+      else:
+        loaded_params = load_model(file_path)
+        model = RandomForestClassifier(**loaded_params)
       print(model)
       model.fit(X_train, y_train)
       y_pred = model.predict(X_test)
 
     elif model_type == "decision_tree":
-      model = DecisionTreeClassifier(random_state=42)
+      if not file_path:
+        model = DecisionTreeClassifier(random_state=42)
+      else:
+        model = DecisionTreeClassifier(**loaded_params)
       print(model)
       model.fit(X_train, y_train)
       y_pred = model.predict(X_test)
