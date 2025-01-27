@@ -1,4 +1,5 @@
 import pandas as pd
+import json
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -6,6 +7,16 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
+
+def load_model(file_name):
+  with open(file_name, 'r') as f:
+    loaded_params = json.load(f)
+  
+  return loaded_params
+
+def save_model(best_params, file_name):
+  with open(file_name, 'w') as f:
+    json.dump(best_params, f)
 
 def train_test_model(X, y, model_type):
     """
