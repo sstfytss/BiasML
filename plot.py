@@ -196,50 +196,108 @@ def predicted_distributions_one_hot(x_test, y_pred, col_prefix):
 
     return y0_summary, y1_summary
 
-def plot_summary(df1, df2, dist_type, col, dq_type, target1=0, target2=1):
-    """
-    Plots two dataframes side by side for comparison based on percentages and counts.
+def plot_summary(df1, df2, dist_type, col, dq_type, target1=0, target2=1, show_labels=True):
+   """
+   Plots two dataframes side by side for comparison based on percentages and counts.
+   
+   Parameters:
+   df1, df2 (pd.DataFrame): DataFrames containing 'Count' and 'Percentage'.
+   col (str): Column name or label for x-axis.
+   target1, target2 (int): Labels for the two groups being compared.
+   show_labels (bool): Whether to show percentage and count labels on bars
+   """
+   # Get all unique categories and fill missing with 0
+   all_index = df1.index.union(df2.index)
+   df1 = df1.reindex(all_index, fill_value=0)
+   df2 = df2.reindex(all_index, fill_value=0)
+   
+   # Setup figure size and bar width
+   plt.figure(figsize=(14, 7))  # Made figure wider
+   bar_width = 0.35  # Slightly narrower bars
+   
+   # Positions for bars
+   r1 = range(len(df1))  # X positions for first set of bars
+   r2 = [x + bar_width for x in r1]  # X positions for second set of bars
+   
+   # Plot bars for both DataFrames
+   bars1 = plt.bar(r1, df1['Percentage'], width=bar_width, label=f'Target = {target1}', color='skyblue')
+   bars2 = plt.bar(r2, df2['Percentage'], width=bar_width, label=f'Target = {target2}', color='lightcoral')
+   
+   # Add labels and title
+   plt.xlabel(col)
+   plt.ylabel('Percentage (%)')
+   plt.title(f'{dist_type} Distribution of {col} for {dq_type}')
+   
+   # Add more space between x-axis labels
+   plt.xticks([r + bar_width / 2 for r in range(len(df1))], df1.index, rotation=45, ha='right')
+   plt.subplots_adjust(bottom=0.2)  # Add more space at bottom
+   
+   if show_labels:
+       # Annotate percentages and counts on bars for df1
+       for i, bar in enumerate(bars1):
+           height = bar.get_height()
+           count = df1['Count'].iloc[i]
+           percentage = df1['Percentage'].iloc[i]
+           plt.text(bar.get_x() + bar.get_width() / 2, height + 1,
+                   f'{percentage:.1f}%\n({count})', ha='center', fontsize=10)
+       
+       # Annotate percentages and counts on bars for df2
+       for i, bar in enumerate(bars2):
+           height = bar.get_height()
+           count = df2['Count'].iloc[i]
+           percentage = df2['Percentage'].iloc[i]
+           plt.text(bar.get_x() + bar.get_width() / 2, height + 1,
+                   f'{percentage:.1f}%\n({count})', ha='center', fontsize=10)
+   
+   # Display legend and plot
+   plt.legend()
+   plt.tight_layout()
+   plt.show()
 
-    Parameters:
-    df1, df2 (pd.DataFrame): DataFrames containing 'Count' and 'Percentage'.
-    col (str): Column name or label for x-axis.
-    target1, target2 (int): Labels for the two groups being compared.
-    """
-    # Setup figure size and bar width
-    plt.figure(figsize=(12, 7))
-    bar_width = 0.4  # Width of each bar
+# def plot_summary(df1, df2, dist_type, col, dq_type, target1=0, target2=1):
+#     """
+#     Plots two dataframes side by side for comparison based on percentages and counts.
 
-    # Positions for bars
-    r1 = range(len(df1))  # X positions for first set of bars
-    r2 = [x + bar_width for x in r1]  # X positions for second set of bars
+#     Parameters:
+#     df1, df2 (pd.DataFrame): DataFrames containing 'Count' and 'Percentage'.
+#     col (str): Column name or label for x-axis.
+#     target1, target2 (int): Labels for the two groups being compared.
+#     """
+#     # Setup figure size and bar width
+#     plt.figure(figsize=(12, 7))
+#     bar_width = 0.4  # Width of each bar
 
-    # Plot bars for both DataFrames
-    bars1 = plt.bar(r1, df1['Percentage'], width=bar_width, label=f'Target = {target1}', color='skyblue')
-    bars2 = plt.bar(r2, df2['Percentage'], width=bar_width, label=f'Target = {target2}', color='lightcoral')
+#     # Positions for bars
+#     r1 = range(len(df1))  # X positions for first set of bars
+#     r2 = [x + bar_width for x in r1]  # X positions for second set of bars
 
-    # Add labels and title
-    plt.xlabel(col)
-    plt.ylabel('Percentage (%)')
-    plt.title(f'{dist_type} Distribution of {col} for {dq_type}')
-    plt.xticks([r + bar_width / 2 for r in range(len(df1))], df1.index, rotation=45)  # Center ticks and rotate
+#     # Plot bars for both DataFrames
+#     bars1 = plt.bar(r1, df1['Percentage'], width=bar_width, label=f'Target = {target1}', color='skyblue')
+#     bars2 = plt.bar(r2, df2['Percentage'], width=bar_width, label=f'Target = {target2}', color='lightcoral')
 
-    # Annotate percentages and counts on bars for df1
-    for i, bar in enumerate(bars1):
-        height = bar.get_height()
-        count = df1['Count'].iloc[i]
-        percentage = df1['Percentage'].iloc[i]
-        plt.text(bar.get_x() + bar.get_width() / 2, height + 1,
-                f'{percentage:.1f}%\n({count})', ha='center', fontsize=10)
+#     # Add labels and title
+#     plt.xlabel(col)
+#     plt.ylabel('Percentage (%)')
+#     plt.title(f'{dist_type} Distribution of {col} for {dq_type}')
+#     plt.xticks([r + bar_width / 2 for r in range(len(df1))], df1.index, rotation=45)  # Center ticks and rotate
 
-    # Annotate percentages and counts on bars for df2
-    for i, bar in enumerate(bars2):
-        height = bar.get_height()
-        count = df2['Count'].iloc[i]
-        percentage = df2['Percentage'].iloc[i]
-        plt.text(bar.get_x() + bar.get_width() / 2, height + 1,
-                f'{percentage:.1f}%\n({count})', ha='center', fontsize=10)
+#     # Annotate percentages and counts on bars for df1
+#     for i, bar in enumerate(bars1):
+#         height = bar.get_height()
+#         count = df1['Count'].iloc[i]
+#         percentage = df1['Percentage'].iloc[i]
+#         plt.text(bar.get_x() + bar.get_width() / 2, height + 1,
+#                 f'{percentage:.1f}%\n({count})', ha='center', fontsize=10)
 
-    # Display legend and plot
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+#     # Annotate percentages and counts on bars for df2
+#     for i, bar in enumerate(bars2):
+#         height = bar.get_height()
+#         count = df2['Count'].iloc[i]
+#         percentage = df2['Percentage'].iloc[i]
+#         plt.text(bar.get_x() + bar.get_width() / 2, height + 1,
+#                 f'{percentage:.1f}%\n({count})', ha='center', fontsize=10)
+
+#     # Display legend and plot
+#     plt.legend()
+#     plt.tight_layout()
+#     plt.show()
