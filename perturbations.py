@@ -20,22 +20,22 @@ def _is_one_hot_encoded(df, base):
     # 2. cols are boolean
     # 3. each row has exactly one true
     cond1, cond2, cond3 = len(cols) > 1, all(df[col].dtype == bool for col in cols), df[cols].apply(lambda row: row.sum() == 1, axis=1).all()
-    print(cond1, cond2, cond3)
+    #print(cond1, cond2, cond3)
 
     if not cond3:
       print("here")
       invalid_rows = ~df[cols].apply(lambda row: row.sum() == 1, axis=1)
       # Show the specific rows that don't meet the one-hot encoding criteria
-      print("bad rows", len(df[invalid_rows]))
+      #print("bad rows", len(df[invalid_rows]))
 
     if cond1 and cond2 and cond3:
         return True
     else:
         return False
 
-def add_random_noise(df, prob_replace=0.2, noise_scale=0.1, noise_col=None):
+def add_random_noise(df, prob_replace=0.2, noise_scale=0.1, noise_col=None, condition_function = None):
     """
-    Check if a column is one-hot encoded.
+    Add random noise BASED ON SOME CONDITION FUNCTION
 
     Parameters:
     df (pd.DataFrame): Input DataFrame.
@@ -55,37 +55,73 @@ def add_random_noise(df, prob_replace=0.2, noise_scale=0.1, noise_col=None):
       encoded_cols = [col for col in df_noisy.columns if col.startswith(f"{noise_col}_")]
 
       for idx in range(len(df_noisy)):
-        if np.random.rand() < prob_replace:
-            # Find the current true column for this specific row
-            current_true_col = [col for col in encoded_cols if df_noisy.loc[idx, col]][0]
+        # Find the current true column for this specific row
+        current_true_col = [col for col in encoded_cols if df_noisy.loc[idx, col]][0]
 
-            # Select a different column to make true
-            other_cols = [col for col in encoded_cols if col != current_true_col]
-            new_true_col = np.random.choice(other_cols)
+        # Select a different column to make true
+        other_cols = [col for col in encoded_cols if col != current_true_col]
 
-            # Flip the columns for this row
-            df_noisy.loc[idx, current_true_col] = False
-            df_noisy.loc[idx, new_true_col] = True
+        # if the condition is met
+        if condition_function(current_true_col):
+          # print("condition met: ", current_true_col)
+          # draw the probability
+          if np.random.rand() < prob_replace:
+              # choose a new column
+              new_true_col = np.random.choice(other_cols)
+              # print("new true col", new_true_col)
+
+              # flip the columns for this row
+              df_noisy.loc[idx, current_true_col] = False
+              df_noisy.loc[idx, new_true_col] = True
     else:
       if df_noisy[noise_col].dtype == 'object' or df_noisy[noise_col].dtype == 'category':  # categorical columns
           print("categorical")
+          # print(df_noisy[noise_col])
+
+          # Create mask for values that meet the condition
+          condition_mask = df_noisy[noise_col].apply(condition_function).astype(bool)
+          # print("condition_mask: ", condition_mask)
+          
+          # Generate random probabilities only for values that meet the condition
+          random_probs = np.random.rand(len(df_noisy))
+
+          # print("random_probs: ", random_probs)
+          # Combined mask: value meets condition AND random prob < prob_replace
+          final_mask = condition_mask & (random_probs < prob_replace)
+          # print("final_mask: ", final_mask)
+
           # randomly replace values with other values from the same column
           mask = np.random.rand(len(df_noisy)) < prob_replace
           df_noisy.loc[mask, noise_col] = np.random.choice(df_noisy[noise_col], size=mask.sum())
       elif df_noisy[noise_col].dtype == 'int64':  # numeric columns
           # add gaussian noise
           print("int")
+          # Create mask for values that meet the condition
+          # print("df: ", df_noisy[noise_col])
+          condition_mask = df_noisy[noise_col].apply(condition_function)
+          # print("condition_mask: ", condition_mask)
+          
+          # Generate random probabilities only for values that meet the condition
+          random_probs = np.random.rand(len(df_noisy))
+          # print("random_probs: ", random_probs)
+          # Combined mask: value meets condition AND random prob < prob_replace
+          final_mask = condition_mask & (random_probs < prob_replace)
+          # print("final_mask: ", final_mask)
+
+          ##
           mask = np.random.rand(len(df_noisy)) < prob_replace
+          # print("lens, ", len(mask), len(final_mask))
           #noise = np.random.normal(0, noise_level * df_noisy[col].std(), size=mask.sum())
-          noise = np.random.normal(loc=1, scale=noise_scale * df_noisy[noise_col].std(), size=mask.sum())
-          df_noisy.loc[mask, noise_col] = np.round(df_noisy.loc[mask, noise_col] * noise).astype(int) # round back to int
+          noise = np.random.normal(loc=1, scale=noise_scale * df_noisy[noise_col].std(), size=final_mask.sum())
+          if final_mask.sum() > 0:
+            df_noisy.loc[final_mask, noise_col] = np.round(df_noisy.loc[final_mask, noise_col] * noise).astype(int) # round back to int
       elif df_noisy[noise_col].dtype == 'float':
           # add gaussian noise
           print("float")
           mask = np.random.rand(len(df_noisy)) < prob_replace
           #noise = np.random.normal(0, noise_level * df_noisy[col].std(), size=mask.sum())
-          noise = np.random.normal(loc=1, scale=noise_scale * df_noisy[noise_col].std(), size=mask.sum())
-          df_noisy.loc[mask, noise_col] = df_noisy.loc[mask, noise_col] * noise # round back to int
+          noise = np.random.normal(loc=1, scale=noise_scale * df_noisy[noise_col].std(), size=final_mask.sum())
+          df_noisy.loc[final_mask, noise_col] = df_noisy.loc[final_mask, noise_col] * noise # round back to int
       elif df_noisy[noise_col].dtype == 'bool':  # boolean columns
           print("bool")
           # flip boolean values with the given probability
@@ -93,3 +129,96 @@ def add_random_noise(df, prob_replace=0.2, noise_scale=0.1, noise_col=None):
           df_noisy.loc[mask, noise_col] = ~df_noisy.loc[mask, noise_col]
 
     return df_noisy
+
+# def _is_one_hot_encoded(df, base):
+#     """
+#     Check if a column is one-hot encoded.
+
+#     Parameters:
+#     df (pd.DataFrame): Input DataFrame.
+#     base (str): Column name to check.
+
+#     Returns:
+#     bool: True if one-hot encoded, False otherwise.
+#     """
+
+#     # find cols with the base
+#     cols = [col for col in df.columns if col.startswith(f"{base}_")]
+#     # conditions for one-hot encoding:
+#     # 1. multiple cols exist
+#     # 2. cols are boolean
+#     # 3. each row has exactly one true
+#     cond1, cond2, cond3 = len(cols) > 1, all(df[col].dtype == bool for col in cols), df[cols].apply(lambda row: row.sum() == 1, axis=1).all()
+#     print(cond1, cond2, cond3)
+
+#     if not cond3:
+#       print("here")
+#       invalid_rows = ~df[cols].apply(lambda row: row.sum() == 1, axis=1)
+#       # Show the specific rows that don't meet the one-hot encoding criteria
+#       print("bad rows", len(df[invalid_rows]))
+
+#     if cond1 and cond2 and cond3:
+#         return True
+#     else:
+#         return False
+
+# def add_random_noise(df, prob_replace=0.2, noise_scale=0.1, noise_col=None):
+#     """
+#     Check if a column is one-hot encoded.
+
+#     Parameters:
+#     df (pd.DataFrame): Input DataFrame.
+#     prob_replace (float): Probability to add noise to a particular row
+#     noise_scale (float): Scale for the STD of noise
+#     noise_col (str): The column to add noise too
+
+#     Returns:
+#     df (pd.DataFrame): Output DataFrame with noise.
+#     """
+#     # create a copy
+#     df_noisy = df.copy()
+
+#     # determine the column type
+#     if _is_one_hot_encoded(df_noisy, noise_col):
+#       print("one_hot_encoded")
+#       encoded_cols = [col for col in df_noisy.columns if col.startswith(f"{noise_col}_")]
+
+#       for idx in range(len(df_noisy)):
+#         if np.random.rand() < prob_replace:
+#             # Find the current true column for this specific row
+#             current_true_col = [col for col in encoded_cols if df_noisy.loc[idx, col]][0]
+
+#             # Select a different column to make true
+#             other_cols = [col for col in encoded_cols if col != current_true_col]
+#             new_true_col = np.random.choice(other_cols)
+
+#             # Flip the columns for this row
+#             df_noisy.loc[idx, current_true_col] = False
+#             df_noisy.loc[idx, new_true_col] = True
+#     else:
+#       if df_noisy[noise_col].dtype == 'object' or df_noisy[noise_col].dtype == 'category':  # categorical columns
+#           print("categorical")
+#           # randomly replace values with other values from the same column
+#           mask = np.random.rand(len(df_noisy)) < prob_replace
+#           df_noisy.loc[mask, noise_col] = np.random.choice(df_noisy[noise_col], size=mask.sum())
+#       elif df_noisy[noise_col].dtype == 'int64':  # numeric columns
+#           # add gaussian noise
+#           print("int")
+#           mask = np.random.rand(len(df_noisy)) < prob_replace
+#           #noise = np.random.normal(0, noise_level * df_noisy[col].std(), size=mask.sum())
+#           noise = np.random.normal(loc=1, scale=noise_scale * df_noisy[noise_col].std(), size=mask.sum())
+#           df_noisy.loc[mask, noise_col] = np.round(df_noisy.loc[mask, noise_col] * noise).astype(int) # round back to int
+#       elif df_noisy[noise_col].dtype == 'float':
+#           # add gaussian noise
+#           print("float")
+#           mask = np.random.rand(len(df_noisy)) < prob_replace
+#           #noise = np.random.normal(0, noise_level * df_noisy[col].std(), size=mask.sum())
+#           noise = np.random.normal(loc=1, scale=noise_scale * df_noisy[noise_col].std(), size=mask.sum())
+#           df_noisy.loc[mask, noise_col] = df_noisy.loc[mask, noise_col] * noise # round back to int
+#       elif df_noisy[noise_col].dtype == 'bool':  # boolean columns
+#           print("bool")
+#           # flip boolean values with the given probability
+#           mask = np.random.rand(len(df_noisy)) < prob_replace
+#           df_noisy.loc[mask, noise_col] = ~df_noisy.loc[mask, noise_col]
+
+#     return df_noisy
