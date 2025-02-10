@@ -1,7 +1,58 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import math
+
+def correlation_matrix_grid(df, x_columns=None, y_columns=None):
+    """
+    Create a simple correlation matrix for selected columns.
+
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        Input DataFrame
+    x_columns : list or None
+        Columns for x-axis. If None, uses all columns
+    y_columns : list or None
+        Columns for y-axis. If None, uses x_columns
+    """
+    # Handle columns
+    if x_columns is None:
+        x_columns = df.columns.tolist()
+    if y_columns is None:
+        y_columns = x_columns
+
+    # Calculate correlations
+    correlation_matrix = pd.DataFrame(
+        [[df[x].corr(df[y]) for y in y_columns] for x in x_columns],
+        index=x_columns,
+        columns=y_columns
+    )
+
+    # Plot
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm')
+    plt.title('Correlation Matrix')
+    plt.tight_layout()
+
+    return correlation_matrix
+
+def correlation_matrix_feature(df, feature):
+    # correlation matrix
+    correlation_matrix = df.corr()[feature]
+    print("Correlation Matrix:")
+    print(correlation_matrix)
+
+    # sort by highest correlation
+    correlation_matrix.sort_values(ascending=False).plot(kind='bar', color='skyblue', figsize=(15, 6))
+    plt.title(f"Correlations with {feature}")
+    plt.ylabel("Correlation Coefficient")
+    plt.xlabel("Features")
+    plt.axhline(0, color='black', linewidth=0.8, linestyle='--')
+    plt.tight_layout()
+
+    return plt
 
 def plot_distribution(df, column=None):
     """
