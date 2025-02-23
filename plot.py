@@ -4,6 +4,103 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import math
 
+def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, county_col="County", demographic_cols=None):
+    """
+    Create a bar plot comparing demographic distributions between two sets of counties.
+    Calculates total population for each demographic group before converting to percentages.
+    
+    Parameters:
+    -----------
+    df_old_counties : pandas.DataFrame
+        DataFrame containing the original set of counties
+    df_new_counties : pandas.DataFrame
+        DataFrame containing the new set of counties
+    df_full : pandas.DataFrame
+        DataFrame containing demographic data for all counties
+    county_col : str, default="County"
+        Name of the column containing county identifiers
+    demographic_cols : dict, default=None
+        Dictionary mapping demographic categories to their column names
+        e.g. {'White': 'white_pct', 'Black': 'black_pct', ...}
+        
+    Returns:
+    --------
+    matplotlib.figure.Figure
+        Figure containing the demographic comparison plot
+    """
+    
+    # Default demographic columns if none provided
+    if demographic_cols is None:
+        demographic_cols = {
+            'White': 'White',
+            'Black': 'Black',
+            'Asian': 'Asian',
+            'Hispanic': 'Hispanic',
+            'Native': 'Native',
+            'Pacific': 'Pacific',
+            'Men': 'Men',
+            'Women': 'Women'
+        }
+    
+    def get_demographic_percentages(counties_df):
+        # Merge with full data to get demographics
+        merged = df_full[df_full[county_col].isin(counties_df[county_col])]
+        
+        results = {}
+        total_population = merged['TotalPop'].sum()
+        
+        for demo, col in demographic_cols.items():
+            if demo in ['Men', 'Women']:
+                # For gender, sum the population counts directly
+                total_in_group = merged[col].sum()
+            else:
+                # For racial demographics, multiply percentage by population and sum
+                total_in_group = (merged[col] * merged['TotalPop'] / 100).sum().round()
+            
+            # Convert to percentage
+            results[demo] = (total_in_group / total_population) * 100
+                
+        return pd.Series(results)
+    
+    # Calculate demographic percentages for both sets
+    old_demographics = get_demographic_percentages(df_old_counties)
+    new_demographics = get_demographic_percentages(df_new_counties)
+    
+    # Create visualization
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    x = np.arange(len(demographic_cols))
+    width = 0.35
+    
+    old_percentages = [old_demographics[demo] for demo in demographic_cols.keys()]
+    new_percentages = [new_demographics[demo] for demo in demographic_cols.keys()]
+    
+    # Create bars
+    ax.bar([i - width/2 for i in x], old_percentages, width, 
+           label= 'Results Before DQ Issues', color='skyblue')
+    ax.bar([i + width/2 for i in x], new_percentages, width, 
+           label='Results After DQ Issues', color='lightcoral')
+    
+    # Customize plot
+    ax.set_ylabel('Percentage')
+    ax.set_title('Demographic Distributions in Final Results Before and After DQ Issues')
+    ax.set_xticks(x)
+    ax.set_xticklabels(demographic_cols.keys())
+    ax.legend()
+    
+    # Add percentage labels on bars
+    def add_labels(positions, values):
+        for pos, val in zip(positions, values):
+            ax.text(pos, val, f'{val:.1f}%', ha='center', va='bottom')
+    
+    add_labels([i - width/2 for i in x], old_percentages)
+    add_labels([i + width/2 for i in x], new_percentages)
+    
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    
+    return fig
+
 def correlation_matrix_grid(df, x_columns=None, y_columns=None):
     """
     Create a simple correlation matrix for selected columns.

@@ -119,3 +119,61 @@ def add_random_noise(df, prob_replace=0.2, noise_scale=0.1, noise_col=None, cond
           df_noisy.loc[final_mask, noise_col] = ~df_noisy.loc[df_noisy, noise_col]
 
     return df_noisy
+
+def add_missingness(df, prob_replace=0.2, noise_col=None, cond_col=None, condition_function=None):
+    """
+    Add missing values (NaN) to specified columns in a DataFrame.
+
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    prob_missing (float): Probability to set a value as missing for a particular row
+    missing_col (str): The column to add missing values to
+    cond_col (str): Column to check condition on
+    condition_function (callable): Function that returns True/False for condition checking
+
+    Returns:
+    df (pd.DataFrame): Output DataFrame with missing values.
+    """
+    import numpy as np
+    import pandas as pd
+    
+    df_missing = df.copy()
+
+    # determine the column type
+    if _is_one_hot_encoded(df_missing, noise_col):
+        print("one_hot_encoded")
+        encoded_cols = [col for col in df_missing.columns if col.startswith(f"{noise_col}_")]
+
+        for idx in range(len(df_missing)):
+            # Check condition if provided
+            if condition_function and not condition_function(df_missing.loc[idx, cond_col]):
+                continue
+                
+            # Only proceed with probability prob_missing
+            if np.random.rand() >= prob_replace:
+                continue
+                
+            # Set all encoded columns to 0 (equivalent to NaN for one-hot)
+            for col in encoded_cols:
+                df_missing.loc[idx, col] = 0
+                
+    else:
+        # Create condition mask
+        condition_mask = pd.Series(True, index=df_missing.index)
+        if condition_function and cond_col:
+            condition_mask = df_missing[cond_col].apply(condition_function)
+        
+        # Generate random probabilities
+        random_mask = np.random.rand(len(df_missing)) < prob_replace
+        
+        # Combined mask: value meets condition AND random prob < prob_missing
+        final_mask = condition_mask & random_mask
+        
+        # Set values to NaN regardless of dtype
+        df_missing.loc[final_mask, noise_col] = np.nan
+        
+        # For categorical columns, ensure the column type remains categorical
+        if df_missing[noise_col].dtype.name == 'category':
+            df_missing[noise_col] = df_missing[noise_col].astype('category')
+
+    return df_missing
