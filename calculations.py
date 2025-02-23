@@ -193,4 +193,4 @@ def binary_disparate_impact(true_positives, true_negatives, false_positives, fal
         'fn_counties': len(fn_data)
     }
     
-    return bias_metric, metrics, tp_data, fn_data
+    return bias_metric, metrics
