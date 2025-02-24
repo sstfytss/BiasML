@@ -6,8 +6,8 @@ import math
 
 def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, county_col="County", demographic_cols=None):
     """
-    Create a bar plot comparing demographic distributions between two sets of counties.
-    Calculates total population for each demographic group before converting to percentages.
+    Create a bar plot comparing demographic distributions between two sets of counties and return detailed statistics.
+    Stores absolute population counts and calculates percentages only for visualization.
     
     Parameters:
     -----------
@@ -25,8 +25,14 @@ def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, count
         
     Returns:
     --------
-    matplotlib.figure.Figure
-        Figure containing the demographic comparison plot
+    tuple
+        - matplotlib.figure.Figure: Figure containing the demographic comparison plot
+        - dict: Dictionary containing detailed statistics including:
+            - 'old_stats': Population counts for original counties
+            - 'new_stats': Population counts for new counties
+            - 'differences': Absolute population differences between sets
+            - 'percent_changes': Relative percent changes between sets
+            - 'population_stats': Total population statistics
     """
     
     # Default demographic columns if none provided
@@ -42,12 +48,15 @@ def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, count
             'Women': 'Women'
         }
     
-    def get_demographic_percentages(counties_df):
+    def get_demographic_stats(counties_df):
         # Merge with full data to get demographics
         merged = df_full[df_full[county_col].isin(counties_df[county_col])]
         
-        results = {}
-        total_population = merged['TotalPop'].sum()
+        stats = {
+            'total_population': merged['TotalPop'].sum(),
+            'num_counties': len(merged),
+            'demographics': {}
+        }
         
         for demo, col in demographic_cols.items():
             if demo in ['Men', 'Women']:
@@ -57,14 +66,32 @@ def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, count
                 # For racial demographics, multiply percentage by population and sum
                 total_in_group = (merged[col] * merged['TotalPop'] / 100).sum().round()
             
-            # Convert to percentage
-            results[demo] = (total_in_group / total_population) * 100
-                
-        return pd.Series(results)
+            # Store absolute population count
+            stats['demographics'][demo] = int(total_in_group)
+            
+        return stats
     
-    # Calculate demographic percentages for both sets
-    old_demographics = get_demographic_percentages(df_old_counties)
-    new_demographics = get_demographic_percentages(df_new_counties)
+    # Calculate demographic statistics for both sets
+    old_stats = get_demographic_stats(df_old_counties)
+    new_stats = get_demographic_stats(df_new_counties)
+    
+    # Calculate absolute differences and percent changes
+    differences = {}
+    percent_changes = {}
+    for demo in demographic_cols.keys():
+        old_count = old_stats['demographics'][demo]
+        new_count = new_stats['demographics'][demo]
+        
+        differences[demo] = new_count - old_count
+        percent_changes[demo] = ((new_count - old_count) / old_count * 100) if old_count != 0 else float('inf')
+    
+    # Calculate percentages for visualization
+    def get_percentages(stats):
+        return {demo: (count / stats['total_population'] * 100) 
+                for demo, count in stats['demographics'].items()}
+    
+    old_demographic_pcts = get_percentages(old_stats)
+    new_demographic_pcts = get_percentages(new_stats)
     
     # Create visualization
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -72,12 +99,12 @@ def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, count
     x = np.arange(len(demographic_cols))
     width = 0.35
     
-    old_percentages = [old_demographics[demo] for demo in demographic_cols.keys()]
-    new_percentages = [new_demographics[demo] for demo in demographic_cols.keys()]
+    old_percentages = [old_demographic_pcts[demo] for demo in demographic_cols.keys()]
+    new_percentages = [new_demographic_pcts[demo] for demo in demographic_cols.keys()]
     
     # Create bars
     ax.bar([i - width/2 for i in x], old_percentages, width, 
-           label= 'Results Before DQ Issues', color='skyblue')
+           label='Results Before DQ Issues', color='skyblue')
     ax.bar([i + width/2 for i in x], new_percentages, width, 
            label='Results After DQ Issues', color='lightcoral')
     
@@ -99,7 +126,27 @@ def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, count
     plt.xticks(rotation=45)
     plt.tight_layout()
     
-    return fig
+    # Prepare return statistics
+    stats_dict = {
+        'old_stats': {
+            'demographics': old_stats['demographics'],  # Now contains absolute counts
+            'total_population': old_stats['total_population'],
+            'num_counties': old_stats['num_counties']
+        },
+        'new_stats': {
+            'demographics': new_stats['demographics'],  # Now contains absolute counts
+            'total_population': new_stats['total_population'],
+            'num_counties': new_stats['num_counties']
+        },
+        'differences': differences,  # Absolute population differences
+        'percent_changes': percent_changes,
+        'population_change': {
+            'absolute': new_stats['total_population'] - old_stats['total_population'],
+            'percentage': ((new_stats['total_population'] - old_stats['total_population']) / old_stats['total_population']) * 100
+        }
+    }
+    
+    return fig, stats_dict
 
 def correlation_matrix_grid(df, x_columns=None, y_columns=None):
     """
