@@ -137,4 +137,66 @@ def binary_disparate_impact(true_positives, true_negatives, false_positives, fal
 
     # throw error for gender and race mix
     state_col = "State"
-    if (majority_col in ['Men', 'W
+    if (majority_col in ['Men', 'Women'] and minority_col not in ['Men', 'Women']) or (minority_col in ['Men', 'Women'] and majority_col not in ['Men', 'Women']):
+      raise ValueError("Gender and race mix not allowed")
+    elif (majority_col in ['White', 'Black', 'Asian', 'Pacific', 'Native', 'Hispanic'] and minority_col not in ['White', 'Black', 'Asian', 'Pacific', 'Native', 'Hispanic']) or (minority_col in ['White', 'Black', 'Asian', 'Pacific', 'Native', 'Hispanic'] and majority_col not in ['White', 'Black', 'Asian', 'Pacific', 'Native', 'Hispanic']):
+      raise ValueError("Gender and race mix not allowed")
+    
+    # the data is stored differently for gender and race
+    if majority_col in ['Men', 'Women'] or minority_col in ['Men', 'Women']:
+      agg_data = (full_data.groupby([id_col, state_col])
+                  .agg({
+                      # get populations of each demographic
+                      population_col: 'sum',
+                      majority_col: lambda x: (x).sum(),
+                      minority_col: lambda x: (x).sum()
+                  })
+                  .reset_index())
+    else:
+      agg_data = (full_data.groupby([id_col, state_col])
+                  .agg({
+                      # get populations of each demographic
+                      population_col: 'sum',
+                      majority_col: lambda x: (x * 0.01 * full_data.loc[x.index, population_col]).sum().round(),
+                      minority_col: lambda x: (x * 0.01 * full_data.loc[x.index, population_col]).sum().round()
+                  })
+                  .reset_index())
+    
+    # join demographic data with the tp, fn dataframes
+    tp_data = true_positives[[id_col, state_col]].merge(agg_data, on=[id_col, state_col], how='left')
+    fn_data = false_negatives[[id_col, state_col]].merge(agg_data, on=[id_col, state_col], how='left')
+
+    # calculate tpr for majority group
+    majority_tp_pop = tp_data[majority_col].sum()
+    majority_fn_pop = fn_data[majority_col].sum()
+    majority_total_pop = majority_tp_pop + majority_fn_pop
+    majority_tpr = majority_tp_pop / majority_total_pop if majority_total_pop > 0 else 0
+    
+    # calculate tpr for minority group
+    minority_tp_pop = tp_data[minority_col].sum()
+    minority_fn_pop = fn_data[minority_col].sum()
+    minority_total_pop = minority_tp_pop + minority_fn_pop
+    minority_tpr = minority_tp_pop / minority_total_pop if minority_total_pop > 0 else 0
+    
+    # calculate bias metric
+    bias_metric = minority_tpr / majority_tpr if majority_tpr > 0 else float('inf')
+    
+    # compile
+    metrics = {
+        'minority_tpr': minority_tpr,
+        'majority_tpr': majority_tpr,
+        'minority_total_population': minority_total_pop,
+        'majority_total_population': majority_total_pop,
+        'minority_tp_population': minority_tp_pop,
+        'majority_tp_population': majority_tp_pop,
+        'minority_fn_population': minority_fn_pop,
+        'majority_fn_population': majority_fn_pop,
+        'total_counties': len(agg_data),
+        'tp_counties': len(tp_data),
+        'fn_counties': len(fn_data)
+    }
+
+    print(bias_metric)
+    print(metrics)
+    
+    return bias_metric, metrics
