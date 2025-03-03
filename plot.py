@@ -49,8 +49,23 @@ def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, count
         }
     
     def get_demographic_stats(counties_df):
-        # Merge with full data to get demographics
-        merged = df_full[df_full[county_col].isin(counties_df[county_col])]
+        # # Merge with full data to get demographics
+        # merged = df_full[df_full[county_col].isin(counties_df[county_col])]
+
+        # # print merged where county_col = Jefferson County
+        # jefferson_rows = merged[merged[county_col] == "Jefferson County"]
+
+        # # Print the filtered rows
+        # print(jefferson_rows)
+
+        # fixed
+        merged = pd.merge(df_full, counties_df, on=["County", "State"], how="inner")
+
+        # print merged where county_col = Jefferson County
+        jefferson_rows = merged[merged[county_col] == "Jefferson County"]
+
+        # # Print the filtered rows
+        # print(jefferson_rows)
         
         stats = {
             'total_population': merged['TotalPop'].sum(),
