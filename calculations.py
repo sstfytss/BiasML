@@ -1,3 +1,29 @@
+def get_percentiles(df, column_name):
+    """
+    Calculate specific percentiles (10th, 25th, 50th, 75th, 90th, 95th) for a DataFrame column.
+
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_name (str): Name of the column to calculate percentiles for
+
+    Returns:
+    dict: Dictionary containing the percentiles and their values
+    """
+    percentiles = [10, 15, 20, 25, 50, 75, 90, 95]
+    results = df[column_name].describe(percentiles=[0.10, 0.15, 0.20, 0.25, 0.50, 0.75, 0.90, 0.95])
+
+    return {
+        'p10': results['10%'],
+        'p15': results['15%'],
+        'p20': results['20%'],
+        'p25': results['25%'],
+        'p50': results['50%'],
+        'p75': results['75%'],
+        'p90': results['90%'],
+        'p95': results['95%']
+    }
+
+
 def rank_changes(df_old, df_new, id_col="County"):
     """
     Compares the rankings (row positions) of counties between the original and data quality issue results.
