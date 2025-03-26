@@ -169,8 +169,7 @@ def plot_column_relationship(df, x_column, y_column, title=None, kind='scatter',
 
     plt.tight_layout()
     return fig, ax
-
-def plot_demographic_percentages(demographic_percentages, demographic_variance):
+def plot_demographic_percentages(demographic_percentages, demographic_variance, bias, bias_variance):
     """
     Create a bar plot comparing old and new demographic percentages using matplotlib,
     with error bars representing variance (or standard deviation).
@@ -179,6 +178,8 @@ def plot_demographic_percentages(demographic_percentages, demographic_variance):
     demographic_percentages (dict): Dictionary containing 'old_stats' and 'new_stats' with demographic percentages.
     demographic_variance (dict): Dictionary containing 'old_stats' and 'new_stats' with variance (or standard deviation)
                                  values for each demographic.
+    bias (float): The overall bias value to display.
+    bias_variance (float): The variance of the bias to display.
     """
     import matplotlib.pyplot as plt
     import numpy as np
@@ -194,11 +195,10 @@ def plot_demographic_percentages(demographic_percentages, demographic_variance):
     # Set up the plot
     plt.figure(figsize=(12, 6))
 
-    # Set the width of each bar and positions of the bars
     width = 0.35
     x = np.arange(len(demographics))
 
-    # Create bars with error bars using yerr parameter (capsize adds a little cap to the error bars)
+    # Create bars with error bars
     plt.bar(x - width/2, old_values, width, capsize=5,
             label='Before DQ Issues', color='skyblue')
     plt.bar(x + width/2, new_values, width, yerr=new_errors, capsize=5,
@@ -209,7 +209,8 @@ def plot_demographic_percentages(demographic_percentages, demographic_variance):
     plt.ylabel('Percentage (%)')
     plt.title('Averaged Demographic Distribution Before and After DQ Issues')
     plt.xticks(x, demographics, rotation=45, ha='right')
-    plt.legend()
+    # plt.legend()
+    legend = plt.legend(loc='upper right', bbox_to_anchor=(1, 1))
 
     # Add value labels on top of each bar
     for i, v in enumerate(old_values):
@@ -217,7 +218,12 @@ def plot_demographic_percentages(demographic_percentages, demographic_variance):
     for i, v in enumerate(new_values):
         plt.text(i + width/2, v + 0.5, f'{v:.1f}%', ha='center', va='bottom')
 
-    # Adjust layout to prevent label cutoff
+    # Add bias info as a text box
+    bias_text = f"Avg. Bias: {bias:.3f}\nBias STD: {bias_variance:.3f}"
+    plt.gca().text(0.73, 0.97, bias_text, transform=plt.gca().transAxes,
+                   fontsize=10, verticalalignment='top',
+                   bbox=dict(boxstyle='round,pad=0.4', facecolor='white', alpha=0.8))
+
     plt.tight_layout()
 
     return plt.gcf()
