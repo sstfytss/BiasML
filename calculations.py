@@ -1,3 +1,5 @@
+import statistics
+
 def get_percentiles(df, column_name):
     """
     Calculate specific percentiles (10th, 25th, 50th, 75th, 90th, 95th) for a DataFrame column.
@@ -226,3 +228,82 @@ def binary_disparate_impact(true_positives, true_negatives, false_positives, fal
     print(metrics)
     
     return bias_metric, metrics
+
+def process_iteration_results(bias_metrics, stats_list):
+    """
+    Process bias metrics and demographic percentages across iterations.
+    First aggregates total counts, then calculates percentages and their standard deviations.
+
+    Parameters:
+    bias_metrics (list): List of bias metric values from each iteration.
+    stats_list (list): List of stats dictionaries from each iteration.
+
+    Returns:
+    tuple: ((average_bias, bias_std), (demographic_percentages, demographic_std))
+        - average_bias: float representing the average bias metric.
+        - bias_std: float representing the standard deviation of the bias metric.
+        - demographic_percentages: dict containing aggregated demographic percentages for old and new stats.
+        - demographic_std: dict containing the standard deviation for each demographic percentage across iterations.
+    """
+    # calc average bias and its std
+    avg_bias = sum(bias_metrics) / len(bias_metrics)
+    bias_std = statistics.stdev(bias_metrics) if len(bias_metrics) > 1 else 0
+
+    # list of demographics
+    demographics = ['White', 'Black', 'Asian', 'Hispanic', 'Native', 'Pacific', 'Men', 'Women']
+
+    # aggregate counts for percentages (weighted over all iterations)
+    old_counts = {demo: 0 for demo in demographics}
+    new_counts = {demo: 0 for demo in demographics}
+    old_total = 0
+    new_total = 0
+
+    # list for percentages (to compute standard deviation)
+    new_percentages_list = {demo: [] for demo in demographics}
+
+    # for each iterations stats
+    for stats in stats_list:
+        old_stats = stats['old_stats']
+        new_stats = stats['new_stats']
+
+        # update aggregated counts and total populations.
+        for demo in demographics:
+            old_counts[demo] += old_stats['demographics'][demo]
+            new_counts[demo] += new_stats['demographics'][demo]
+        old_total += old_stats['total_population']
+        new_total += new_stats['total_population']
+
+        # here compute the actual percentage for the iteration (so we can calculate the STD later)
+        for demo in demographics:
+            if new_stats['total_population']: # we use new_stats['total_pop'] bc this is the stat dictionary for the particular iteration
+                new_percent = (new_stats['demographics'][demo] / new_stats['total_population']) * 100
+            else:
+                new_percent = 0
+
+            # store new percentages in a list
+            new_percentages_list[demo].append(new_percent)
+
+    # compute the aggregated statistics for each demographic
+    demographic_percentages = {
+        'old_stats': {
+            demo: (count / old_total) * 100 if old_total else 0
+            for demo, count in old_counts.items()
+        },
+        'new_stats': {
+            demo: (count / new_total) * 100 if new_total else 0
+            for demo, count in new_counts.items()
+        }
+    }
+
+    # calc standard deviation over all iterations (just for DF with DQ issues)
+    demographic_std = {
+        'old_stats': {},
+        'new_stats': {}
+    }
+    for demo in demographics:
+        if len(new_percentages_list[demo]) > 1:
+            demographic_std['new_stats'][demo] = statistics.stdev(new_percentages_list[demo])
+        else:
+            demographic_std['new_stats'][demo] = 0
+
+    return avg_bias, demographic_percentages, bias_std, demographic_std
