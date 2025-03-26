@@ -1,4 +1,5 @@
 import statistics
+import pandas as pd
 
 def get_percentiles(df, column_name):
     """
