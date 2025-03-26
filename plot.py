@@ -4,6 +4,225 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import math
 
+def plot_column_relationship(df, x_column, y_column, title=None, kind='scatter',
+                             add_regression=False, figsize=(10, 6),
+                             highlight_outliers=False, outlier_threshold=1.5,
+                             condition_column=None, condition_value=None,
+                             filter_func=None, filter_description=None):
+    """
+    Plot the relationship between two columns in a pandas DataFrame with flexible filtering options.
+
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        The DataFrame containing the data
+    x_column : str
+        The name of the column to be plotted on the x-axis
+    y_column : str
+        The name of the column to be plotted on the y-axis
+    title : str, optional
+        The title of the plot. If None, a default title will be generated
+    kind : str, optional
+        The kind of plot to generate ('scatter', 'hexbin', 'kde', 'line')
+    add_regression : bool, optional
+        Whether to add a regression line (for scatter plots)
+    figsize : tuple, optional
+        The size of the figure (width, height)
+    highlight_outliers : bool, optional
+        Whether to highlight potential outliers
+    outlier_threshold : float, optional
+        The threshold (in terms of IQR) for determining outliers
+    condition_column : str, optional
+        Column name to filter on (e.g., 'race')
+    condition_value : any, optional
+        Value to filter for (e.g., 'black')
+    filter_func : callable, optional
+        A function that takes a pandas Series (row) and returns True or False
+    filter_description : str, optional
+        Description of the filter function for the title
+
+    Returns:
+    --------
+    fig, ax : tuple
+        The matplotlib figure and axis objects
+    """
+    # Create a copy of the DataFrame
+    plot_df = df.copy()
+
+    # Apply filters if provided
+    condition_applied = False
+
+    if filter_func is not None:
+        # Apply the custom filter function to each row
+        # plot_df = plot_df[plot_df.apply(filter_func, axis=1)]
+        plot_df = plot_df[plot_df.apply(lambda row: filter_func(row), axis=1)]
+        print(plot_df['VotingAgeCitizen'])
+        condition_applied = True
+
+        # Update title to reflect the custom filter
+        if title is None:
+            if filter_description:
+                title = f"{y_column} vs {x_column} ({filter_description})"
+            else:
+                title = f"{y_column} vs {x_column} (custom filter applied)"
+
+    elif condition_column is not None and condition_value is not None:
+        # Apply the simple condition filter
+        plot_df = plot_df[plot_df[condition_column] == condition_value]
+        condition_applied = True
+
+        # Update title to reflect the condition
+        if title is None:
+            title = f"{y_column} vs {x_column} (where {condition_column} = {condition_value})"
+
+    else:
+        # No filtering applied
+        if title is None:
+            title = f"{y_column} vs {x_column}"
+
+    # Keep only the necessary columns and drop NA values
+    plot_df = plot_df[[x_column, y_column]].dropna()
+
+    # Check if we have data after filtering
+    if plot_df.empty:
+        print(f"No data available after applying the filtering conditions")
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.text(0.5, 0.5, "No data available after filtering",
+                horizontalalignment='center', verticalalignment='center')
+        ax.set_title(title)
+        return fig, ax
+
+    # Create the figure and axis
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Choose the plot type
+    if kind == 'scatter':
+        sns.scatterplot(data=plot_df, x=x_column, y=y_column, ax=ax)
+
+        # Add regression line if requested
+        if add_regression:
+            sns.regplot(data=plot_df, x=x_column, y=y_column,
+                       scatter=False, line_kws={"color": "red"}, ax=ax)
+
+        # Highlight outliers if requested
+        if highlight_outliers and len(plot_df) >= 4:  # Need enough data for IQR
+            # Calculate IQR for y-column
+            Q1 = plot_df[y_column].quantile(0.25)
+            Q3 = plot_df[y_column].quantile(0.75)
+            IQR = Q3 - Q1
+
+            # Define outlier thresholds
+            lower_bound = Q1 - outlier_threshold * IQR
+            upper_bound = Q3 + outlier_threshold * IQR
+
+            # Identify outliers
+            outliers = plot_df[(plot_df[y_column] < lower_bound) |
+                              (plot_df[y_column] > upper_bound)]
+
+            # Highlight outliers
+            if not outliers.empty:
+                sns.scatterplot(data=outliers, x=x_column, y=y_column,
+                               color='red', s=100, label='Outliers', ax=ax)
+                ax.legend()
+
+    elif kind == 'hexbin':
+        plt.hexbin(plot_df[x_column], plot_df[y_column], gridsize=20, cmap='Blues')
+        plt.colorbar(label='Count')
+
+    elif kind == 'kde':
+        sns.kdeplot(data=plot_df, x=x_column, y=y_column, fill=True, cmap="Blues", ax=ax)
+
+    elif kind == 'line':
+        # Sort by x-column to ensure proper line plot
+        sorted_df = plot_df.sort_values(by=x_column)
+        plt.plot(sorted_df[x_column], sorted_df[y_column])
+
+    # Add labels and title
+    ax.set_xlabel(x_column)
+    ax.set_ylabel(y_column)
+    ax.set_title(title)
+
+    ax.set_xlim(left=0)
+
+    # Add correlation coefficient as text
+    correlation = plot_df[x_column].corr(plot_df[y_column])
+    ax.annotate(f"Correlation: {correlation:.2f}",
+                xy=(0.05, 0.95), xycoords='axes fraction',
+                fontsize=10, bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8))
+
+    # Add summary statistics
+    stats_text = (f"N: {len(plot_df)}\n"
+                 f"{x_column} mean: {plot_df[x_column].mean():.2f}\n"
+                 f"{y_column} mean: {plot_df[y_column].mean():.2f}")
+
+    if condition_applied:
+        if len(df) > 0:
+            # Add comparison to the full dataset if a filter was applied
+            all_mean_x = df[x_column].mean()
+            all_mean_y = df[y_column].mean()
+            stats_text += f"\n\nFull dataset (N={len(df)}):\n"
+            stats_text += f"{x_column} mean: {all_mean_x:.2f}\n"
+            stats_text += f"{y_column} mean: {all_mean_y:.2f}"
+
+    ax.annotate(stats_text, xy=(0.05, 0.05), xycoords='axes fraction',
+                fontsize=10, bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8))
+
+    plt.tight_layout()
+    return fig, ax
+
+def plot_demographic_percentages(demographic_percentages, demographic_variance):
+    """
+    Create a bar plot comparing old and new demographic percentages using matplotlib,
+    with error bars representing variance (or standard deviation).
+
+    Parameters:
+    demographic_percentages (dict): Dictionary containing 'old_stats' and 'new_stats' with demographic percentages.
+    demographic_variance (dict): Dictionary containing 'old_stats' and 'new_stats' with variance (or standard deviation)
+                                 values for each demographic.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Get demographics and their values
+    demographics = list(demographic_percentages['old_stats'].keys())
+    old_values = [demographic_percentages['old_stats'][d] for d in demographics]
+    new_values = [demographic_percentages['new_stats'][d] for d in demographics]
+
+    # Get the variance (or standard deviation) values for error bars
+    new_errors = [demographic_variance['new_stats'][d] for d in demographics]
+
+    # Set up the plot
+    plt.figure(figsize=(12, 6))
+
+    # Set the width of each bar and positions of the bars
+    width = 0.35
+    x = np.arange(len(demographics))
+
+    # Create bars with error bars using yerr parameter (capsize adds a little cap to the error bars)
+    plt.bar(x - width/2, old_values, width, capsize=5,
+            label='Before DQ Issues', color='skyblue')
+    plt.bar(x + width/2, new_values, width, yerr=new_errors, capsize=5,
+            label='After DQ Issues', color='lightcoral')
+
+    # Customize the plot
+    plt.xlabel('Demographics')
+    plt.ylabel('Percentage (%)')
+    plt.title('Averaged Demographic Distribution Before and After DQ Issues')
+    plt.xticks(x, demographics, rotation=45, ha='right')
+    plt.legend()
+
+    # Add value labels on top of each bar
+    for i, v in enumerate(old_values):
+        plt.text(i - width/2, v + 0.5, f'{v:.1f}%', ha='center', va='bottom')
+    for i, v in enumerate(new_values):
+        plt.text(i + width/2, v + 0.5, f'{v:.1f}%', ha='center', va='bottom')
+
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+
+    return plt.gcf()
+
+
 def plot_demographic_comparison(df_old_counties, df_new_counties, df_full, county_col="County", demographic_cols=None):
     """
     Create a bar plot comparing demographic distributions between two sets of counties and return detailed statistics.
